@@ -8,9 +8,12 @@ const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expires
 export const register = async (req, res) => {
     const { name, email, password, role, course } = req.body;
     
+    console.log(`[Register] Attempting to register user: ${email}`);
+
     try {
         const userExists = await User.findOne({ email });
         if (userExists) {
+            console.log(`[Register] User already exists: ${email}`);
             return res.status(400).json({ message: 'User already exists' });
         }
 
@@ -26,6 +29,8 @@ export const register = async (req, res) => {
             isVerified: false 
         });
 
+        console.log(`[Register] User created in DB with ID: ${user._id}`);
+
         const verifyUrl = `${process.env.FRONTEND_URL}/verify/${verificationToken}`;
         const message = `
             <h1>Verify your Email</h1>
@@ -34,6 +39,7 @@ export const register = async (req, res) => {
         `;
 
         try {
+            console.log(`[Register] Calling sendEmail...`);
             await sendEmail({
                 email: user.email,
                 subject: 'Email Verification',
@@ -41,12 +47,14 @@ export const register = async (req, res) => {
             });
             res.status(201).json({ message: 'Registration successful! Please check your email to verify.' });
         } catch (emailError) {
-            console.error("Email failed to send:", emailError);
-            res.status(201).json({ message: 'User created, but verification email failed to send.' });
+            console.error("[Register] CRITICAL EMAIL FAILURE:");
+            console.error(emailError.message);
+            // We respond with success so the frontend doesn't hang, but we know email failed.
+            res.status(201).json({ message: 'User created, but verification email failed to send. Check backend logs for details.' });
         }
 
     } catch (error) {
-        console.error("Registration Logic Error:", error);
+        console.error("[Register] Logic Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
